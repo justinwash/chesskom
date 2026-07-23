@@ -1,0 +1,15 @@
+[package]
+name = "chesskom-kobo"
+description = "Kobo e-ink device backend: framebuffer blit + waveform refresh, and an on-device demo binary."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "chesskom-kobo"
+path = "src/main.rs"
+
+[dependencies]
+chess-core = { path = "../chess-core" }
+chesskom-render = { path = "../chesskom-render" }

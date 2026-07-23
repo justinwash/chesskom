@@ -1,4 +1,6 @@
 /target
+/dist
+*.png
 **/*.rs.bk
 Cargo.lock.orig
 .DS_Store

@@ -1,0 +1,21 @@
+# Cross-compilation for the Kobo (ARM, static musl).
+#
+# The Kobo is armv7 with an older glibc, so we target static musl to produce a
+# single self-contained binary that runs regardless of the device's libc.
+#
+# Linking ARM objects needs a cross-linker. This config uses clang + LLD, which
+# needs no target-specific toolchain package (just `clang`, widely available).
+# If you'd rather use a GNU cross toolchain, install `arm-linux-gnueabihf-gcc`
+# and replace the block below with:
+#
+#   [target.armv7-unknown-linux-musleabihf]
+#   linker = "arm-linux-gnueabihf-gcc"
+#
+# Build with:  cargo build --release --target armv7-unknown-linux-musleabihf -p chesskom-kobo
+
+[target.armv7-unknown-linux-musleabihf]
+linker = "clang"
+rustflags = [
+    "-C", "link-arg=--target=armv7-unknown-linux-musleabihf",
+    "-C", "link-arg=-fuse-ld=lld",
+]

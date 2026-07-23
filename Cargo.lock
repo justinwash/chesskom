@@ -12,3 +12,18 @@ version = "0.1.0"
 dependencies = [
  "chess-core",
 ]
+
+[[package]]
+name = "chesskom-kobo"
+version = "0.1.0"
+dependencies = [
+ "chess-core",
+ "chesskom-render",
+]
+
+[[package]]
+name = "chesskom-render"
+version = "0.1.0"
+dependencies = [
+ "chess-core",
+]

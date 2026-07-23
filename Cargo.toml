@@ -2,7 +2,9 @@
 resolver = "2"
 members = [
     "crates/chess-core",
+    "crates/chesskom-render",
     "crates/chesskom-cli",
+    "crates/chesskom-kobo",
 ]
 
 [workspace.package]

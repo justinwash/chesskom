@@ -1,0 +1,10 @@
+[package]
+name = "chesskom-render"
+description = "Dependency-free grayscale board renderer (vector pieces, anti-aliased). Feeds both the desktop PNG preview and the Kobo e-ink framebuffer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chess-core = { path = "../chess-core" }

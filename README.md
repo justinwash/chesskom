@@ -4,9 +4,10 @@ A chess client for Kobo e-readers (primary target: **Kobo Clara BW**), written i
 
 The goal, in order of milestones:
 
-1. **Local two-player pass-and-play with rewind** ✅ *(current)*
-2. **chess.com viewer** — read-only browsing of your ongoing daily games
-3. **Lichess play** — make and submit real moves over the internet
+1. **Local two-player pass-and-play with rewind** ✅
+2. **Board on the Kobo e-ink screen** ✅ *(current — static render; touch input next)*
+3. **chess.com viewer** — read-only browsing of your ongoing daily games
+4. **Lichess play** — make and submit real moves over the internet
 
 ## Why this shape? (feasibility & the ban question)
 
@@ -41,13 +42,15 @@ Some research went into scoping this. The short version:
 
 ```
 crates/
-  chess-core/     dependency-free rules, move generation, game state, rewind, FEN
-  chesskom-cli/   terminal front-end (dev harness for local play + rewind)
+  chess-core/       dependency-free rules, move generation, game state, rewind, FEN
+  chesskom-render/  dependency-free grayscale board renderer (vector pieces, PNG export)
+  chesskom-cli/     terminal front-end (dev harness for local play + rewind)
+  chesskom-kobo/    Kobo e-ink device binary (framebuffer output via FBInk)
 ```
 
-`chess-core` has **no dependencies** and makes no platform assumptions, so it
-cross-compiles to the Kobo untouched. Everything device-specific (UI, input,
-networking) lives outside it.
+`chess-core` and `chesskom-render` have **no dependencies** and make no platform
+assumptions, so they cross-compile to the Kobo untouched. Everything
+device-specific (input, networking) lives outside them.
 
 ### `chess-core` highlights
 
@@ -81,21 +84,65 @@ The CLI is a local two-player board. Commands:
 | `new`          | new game                                           |
 | `quit` / `q`   | exit                                               |
 
-## Kobo target (planned)
+## Rendering & the Kobo screen
 
-The device is `armv7` Linux. The intended cross-compile target is static musl to
-sidestep the device's older glibc:
+The board is drawn by `chesskom-render` into a plain 8-bit grayscale image:
+alternating shaded squares, coordinate labels, a header/footer text line, an
+optional last-move highlight, and **anti-aliased vector pieces** (resolution-
+independent silhouettes — white pieces as outlines, black as solid fills, which
+is exactly the high-contrast idiom e-ink wants). The same image feeds both the
+desktop PNG preview and the device.
+
+Preview a position as a PNG on your desktop:
+
+```sh
+cargo run -p chesskom-render --example preview -- board.png            # start position
+cargo run -p chesskom-render --example preview -- board.png "<FEN>"    # any position
+```
+
+### Building for the Kobo
+
+The device is `armv7` Linux with an older glibc, so we target **static musl** —
+one self-contained ~370 KB binary that runs regardless of the device libc.
 
 ```sh
 rustup target add armv7-unknown-linux-musleabihf
-cargo build --release --target armv7-unknown-linux-musleabihf -p chesskom-cli
+./scripts/build-kobo.sh          # -> dist/chesskom-kobo (static ARM binary)
 ```
 
-On-device UI will draw to the framebuffer (`/dev/fb0`) and read touch input
-(`/dev/input/*`); a chessboard is a natural fit for e-ink (static, high-contrast,
-no animation required). Install will be via NickelMenu/KFMon launcher entries.
-This layer is not built yet — milestone 1 is the portable core plus a desktop
-harness to validate the rules and rewind before touching hardware.
+Cross-linking uses clang + LLD (no target toolchain package needed); see
+[`.cargo/config.toml`](.cargo/config.toml) for the GNU-toolchain alternative.
+
+### Running on the device
+
+`chesskom-kobo` draws the board to the e-ink panel via
+[**FBInk**](https://github.com/NiLuJe/FBInk), the maintained tool that handles
+each Kobo model's framebuffer format and refresh waveform. Install FBInk on the
+Kobo, then:
+
+```sh
+chesskom-kobo                 # draw the starting position
+chesskom-kobo --flip          # Black at the bottom
+chesskom-kobo --fen "<FEN>"   # draw a specific position
+chesskom-kobo --out board.png # desktop test: write a PNG instead of drawing
+```
+
+**Install path:** copy `dist/chesskom-kobo` to `/mnt/onboard/.adds/chesskom/` on
+the device (USB mass storage), `chmod +x` it, and either run it from a terminal
+or add a [NickelMenu](https://github.com/pgaskin/NickelMenu) entry to launch it
+from the stock reader UI.
+
+> **Why FBInk rather than writing `/dev/fb0` directly?** Kobo models span two SoC
+> families (i.MX6 and Allwinner/sunxi) with different e-ink refresh interfaces.
+> FBInk already abstracts them, so it's the reliable way to get correct pixels
+> and a clean refresh without model-specific guesswork. A native, dependency-free
+> direct-framebuffer backend is a planned follow-up that needs on-device tuning.
+
+### Not built yet
+
+Touch input (`/dev/input/*`) and the interactive on-device loop are the next
+step — this milestone gets a correct board onto the panel. After that comes the
+chess.com viewer, then Lichess play.
 
 ## License
 
