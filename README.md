@@ -106,8 +106,10 @@ their own pieces upright — natural for local pass-and-play.
 
 > **Later:** now that pieces can rotate, a "face the current player" variant
 > becomes easy — flip the whole board 180° between turns so the side on move
-> always sees it from their perspective. Deferred until the interactive play loop
-> exists (it needs turn state to drive it).
+> always sees it from their perspective. In that mode the orientation itself
+> tells you whose turn it is (upright pieces = your move), so the explicit
+> "White/Black to move" text can be dropped. Deferred until the interactive play
+> loop exists (it needs turn state to drive it).
 
 Preview a position as a PNG on your desktop:
 

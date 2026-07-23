@@ -43,11 +43,13 @@ pub struct RenderOptions {
     /// facing each other across a flat device each read their own pieces upright.
     ///
     /// TODO (when we build actual gameplay): consider a "face the current player"
-    /// variant — flip the *whole* board (and pieces, and status text) 180° between
-    /// turns so the player on move always sees the board from their side. The
-    /// per-piece rotation we already have is the building block; this just applies
-    /// it to everything based on whose turn it is. Deferred until the interactive
-    /// play loop exists, since it only makes sense with turn state driving it.
+    /// variant — flip the *whole* board 180° between turns so the player on move
+    /// always sees the board from their side. The per-piece rotation we already
+    /// have is the building block; this just applies it to everything based on
+    /// whose turn it is. Bonus: in that mode the orientation itself signals whose
+    /// turn it is (the side seeing upright pieces is on move), so the explicit
+    /// "White/Black to move" text becomes redundant and can be dropped. Deferred
+    /// until the interactive play loop exists, since it needs turn state to drive it.
     pub over_the_board: bool,
 }
 
