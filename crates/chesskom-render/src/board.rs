@@ -39,6 +39,9 @@ pub struct RenderOptions {
     pub highlight: Option<(Square, Square)>,
     /// Which piece artwork to draw.
     pub piece_style: PieceStyle,
+    /// "Over the board" mode: rotate the far side's pieces 180° so two players
+    /// facing each other across a flat device each read their own pieces upright.
+    pub over_the_board: bool,
 }
 
 impl RenderOptions {
@@ -56,6 +59,7 @@ impl RenderOptions {
             footer: None,
             highlight: None,
             piece_style: PieceStyle::Classic,
+            over_the_board: false,
         }
     }
 }
@@ -150,12 +154,15 @@ pub fn render(pos: &Position, opts: &RenderOptions) -> Canvas {
                 } else {
                     opts.light_sq
                 };
+                // In OTB mode, rotate the pieces of the side that isn't at the
+                // bottom so the opposing player reads them upright.
+                let flip = opts.over_the_board && piece.color == opts.orient.opponent();
                 let use_classic =
                     opts.piece_style == PieceStyle::Classic && piece_raster::available();
                 if use_classic {
-                    piece_raster::draw(&mut c, piece.kind, piece.color, x, y, square, sq_bg);
+                    piece_raster::draw(&mut c, piece.kind, piece.color, x, y, square, sq_bg, flip);
                 } else {
-                    draw_piece(&mut c, piece.kind, piece.color, x, y, square, sq_bg);
+                    draw_piece(&mut c, piece.kind, piece.color, x, y, square, sq_bg, flip);
                 }
             }
         }
@@ -182,13 +189,16 @@ fn to_screen(file: i8, rank: i8, orient: Color) -> (u32, u32) {
 }
 
 /// Draw a piece into the square at (x,y) of side `square`, anti-aliased over `bg`.
-fn draw_piece(c: &mut Canvas, kind: chess_core::PieceKind, color: Color, x: u32, y: u32, square: u32, bg: u8) {
+/// When `flip` is set the piece is rotated 180° (OTB mode).
+#[allow(clippy::too_many_arguments)] // low-level blit; a struct would only obscure it
+fn draw_piece(c: &mut Canvas, kind: chess_core::PieceKind, color: Color, x: u32, y: u32, square: u32, bg: u8, flip: bool) {
     let msize = square * SS;
     let mask = pieces::silhouette(kind, msize);
     // Outline thickness scales with size; ~2px at final resolution.
     let outline = ((msize / 44).max(SS)) as i32;
     let interior = mask.erode(outline);
     let fill: i32 = if color == Color::White { 255 } else { 0 };
+    let last = (msize - 1) as i32;
 
     for py in 0..square {
         for px in 0..square {
@@ -196,8 +206,12 @@ fn draw_piece(c: &mut Canvas, kind: chess_core::PieceKind, color: Color, x: u32,
             let mut ink = 0u32;
             for sy in 0..SS {
                 for sx in 0..SS {
-                    let mx = (px * SS + sx) as i32;
-                    let my = (py * SS + sy) as i32;
+                    let mut mx = (px * SS + sx) as i32;
+                    let mut my = (py * SS + sy) as i32;
+                    if flip {
+                        mx = last - mx;
+                        my = last - my;
+                    }
                     if mask.get(mx, my) {
                         cov += 1;
                         // Border pixels are black; interior takes the fill color.

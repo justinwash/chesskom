@@ -100,12 +100,17 @@ Two piece styles are available (`RenderOptions::piece_style`):
 - **Vector** — dependency-free anti-aliased silhouettes drawn from primitives, no
   asset required. A fallback / lightweight option.
 
+**Over-the-board mode** (`RenderOptions::over_the_board`): rotate the far side's
+pieces 180° so two players facing each other across a flat-lying Kobo each read
+their own pieces upright — natural for local pass-and-play.
+
 Preview a position as a PNG on your desktop:
 
 ```sh
 cargo run -p chesskom-render --example preview -- board.png                   # start position
 cargo run -p chesskom-render --example preview -- board.png "<FEN>"           # any position
 cargo run -p chesskom-render --example preview -- board.png "<FEN>" vector    # vector pieces
+cargo run -p chesskom-render --example preview -- board.png "<FEN>" otb       # over-the-board
 ```
 
 ### Building for the Kobo

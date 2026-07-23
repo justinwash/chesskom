@@ -22,11 +22,13 @@ fn main() {
     let mut fen: Option<String> = None;
     let mut orient = Color::White;
     let mut out: Option<String> = None;
+    let mut otb = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--flip" => orient = Color::Black,
+            "--otb" => otb = true,
             "--fen" => fen = args.next(),
             "--out" => out = args.next(),
             "-h" | "--help" => {
@@ -54,6 +56,7 @@ fn main() {
 
     let mut opts = RenderOptions::clara_bw();
     opts.orient = orient;
+    opts.over_the_board = otb;
     opts.header = Some("CHESSKOM".to_string());
     opts.footer = Some(status_text(&pos));
     let canvas = render(&pos, &opts);
@@ -91,6 +94,7 @@ fn print_usage() {
 chesskom-kobo — draw a chess board on the Kobo e-ink screen
 
   --flip           orient with Black at the bottom
+  --otb            over-the-board mode (rotate the far side's pieces 180)
   --fen \"<FEN>\"    render a specific position (default: start position)
   --out <file>     write a PNG instead of drawing to the panel (desktop test)
   -h, --help       show this help

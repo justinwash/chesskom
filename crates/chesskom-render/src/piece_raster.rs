@@ -64,8 +64,19 @@ pub fn available() -> bool {
 }
 
 /// Draw a classic piece into the square at (x, y) of side `square`, composited
-/// over background value `bg`.
-pub fn draw(c: &mut Canvas, kind: PieceKind, color: Color, x: u32, y: u32, square: u32, bg: u8) {
+/// over background value `bg`. When `flip` is set the piece is rotated 180°
+/// (for "over the board" mode, where the far player's pieces face them).
+#[allow(clippy::too_many_arguments)] // low-level blit; a struct would only obscure it
+pub fn draw(
+    c: &mut Canvas,
+    kind: PieceKind,
+    color: Color,
+    x: u32,
+    y: u32,
+    square: u32,
+    bg: u8,
+    flip: bool,
+) {
     let atlas = Atlas::get();
     let (lum, alpha) = atlas.planes(kind, color);
     let src = atlas.size as u32;
@@ -83,7 +94,13 @@ pub fn draw(c: &mut Canvas, kind: PieceKind, color: Color, x: u32, y: u32, squar
             let mut n = 0u32; // pixels in the block
             for sy in sy0..sy1 {
                 for sx in sx0..sx1 {
-                    let idx = (sy * src + sx) as usize;
+                    // 180° rotation is a point reflection through the center.
+                    let (usx, usy) = if flip {
+                        (src - 1 - sx, src - 1 - sy)
+                    } else {
+                        (sx, sy)
+                    };
+                    let idx = (usy * src + usx) as usize;
                     let a = alpha[idx] as u32;
                     a_sum += a;
                     la_sum += lum[idx] as u32 * a;

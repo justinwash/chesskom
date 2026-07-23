@@ -48,6 +48,26 @@ mod tests {
     }
 
     #[test]
+    fn over_the_board_flips_only_the_far_side() {
+        // In OTB mode the far side's pieces are rotated, so the top of the board
+        // differs from the non-OTB render while the bottom (near side) does not.
+        let pos = Position::start();
+        let base = render(&pos, &RenderOptions::clara_bw());
+        let mut otb_opts = RenderOptions::clara_bw();
+        otb_opts.over_the_board = true;
+        let otb = render(&pos, &otb_opts);
+
+        let row = |c: &Canvas, y: u32| -> Vec<u8> {
+            let s = (y * c.width) as usize;
+            c.pixels[s..s + c.width as usize].to_vec()
+        };
+        // A row through Black's back rank (near the top) should change...
+        assert_ne!(row(&base, 190), row(&otb, 190));
+        // ...while a row through White's back rank (near the bottom) should not.
+        assert_eq!(row(&base, 1030), row(&otb, 1030));
+    }
+
+    #[test]
     fn png_roundtrip_header_is_valid() {
         let c = Canvas::new(4, 4, 128);
         let bytes = png::encode_grayscale(&c);

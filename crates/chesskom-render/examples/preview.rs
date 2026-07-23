@@ -12,7 +12,7 @@ use chesskom_render::{board::RenderOptions, png, render, PieceStyle};
 use std::env;
 
 fn main() {
-    // Args: [out.png] [FEN] [vector|classic]
+    // Args: [out.png] [FEN] [flags...]  where flags may include `vector` and `otb`.
     let args: Vec<String> = env::args().collect();
     let out = args.get(1).cloned().unwrap_or_else(|| "board.png".to_string());
     let pos = match args.get(2) {
@@ -22,13 +22,16 @@ fn main() {
         }),
         None => Position::start(),
     };
-    let style = match args.get(3).map(|s| s.as_str()) {
-        Some("vector") => PieceStyle::Vector,
-        _ => PieceStyle::Classic,
+    let flags: Vec<&str> = args.iter().skip(3).map(|s| s.as_str()).collect();
+    let style = if flags.contains(&"vector") {
+        PieceStyle::Vector
+    } else {
+        PieceStyle::Classic
     };
 
     let mut opts = RenderOptions::clara_bw();
     opts.piece_style = style;
+    opts.over_the_board = flags.contains(&"otb");
     opts.orient = Color::White;
     opts.header = Some("CHESSKOM".to_string());
     opts.footer = Some(status_text(&pos));
