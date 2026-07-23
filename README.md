@@ -40,6 +40,9 @@ Some research went into scoping this. The short version:
   SPA, slow refresh, and a big lift to get a modern browser engine running on
   the device. Parked as a future curiosity.
 
+> **Picking this up as a developer?** See [HANDOFF.md](HANDOFF.md) for the status
+> snapshot, dev setup, build/install steps, architecture notes, and what's next.
+
 ## Repository layout
 
 ```
