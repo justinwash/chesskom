@@ -104,6 +104,11 @@ Two piece styles are available (`RenderOptions::piece_style`):
 pieces 180° so two players facing each other across a flat-lying Kobo each read
 their own pieces upright — natural for local pass-and-play.
 
+> **Later:** now that pieces can rotate, a "face the current player" variant
+> becomes easy — flip the whole board 180° between turns so the side on move
+> always sees it from their perspective. Deferred until the interactive play loop
+> exists (it needs turn state to drive it).
+
 Preview a position as a PNG on your desktop:
 
 ```sh

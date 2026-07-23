@@ -41,6 +41,13 @@ pub struct RenderOptions {
     pub piece_style: PieceStyle,
     /// "Over the board" mode: rotate the far side's pieces 180° so two players
     /// facing each other across a flat device each read their own pieces upright.
+    ///
+    /// TODO (when we build actual gameplay): consider a "face the current player"
+    /// variant — flip the *whole* board (and pieces, and status text) 180° between
+    /// turns so the player on move always sees the board from their side. The
+    /// per-piece rotation we already have is the building block; this just applies
+    /// it to everything based on whose turn it is. Deferred until the interactive
+    /// play loop exists, since it only makes sense with turn state driving it.
     pub over_the_board: bool,
 }
 
