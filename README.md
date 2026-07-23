@@ -88,16 +88,24 @@ The CLI is a local two-player board. Commands:
 
 The board is drawn by `chesskom-render` into a plain 8-bit grayscale image:
 alternating shaded squares, coordinate labels, a header/footer text line, an
-optional last-move highlight, and **anti-aliased vector pieces** (resolution-
-independent silhouettes — white pieces as outlines, black as solid fills, which
-is exactly the high-contrast idiom e-ink wants). The same image feeds both the
+optional last-move highlight, and the pieces. The same image feeds both the
 desktop PNG preview and the device.
+
+Two piece styles are available (`RenderOptions::piece_style`):
+
+- **Classic** (default) — the **Cburnett** set (the Wikipedia / Lichess-default
+  artwork), rasterized to a compact embedded grayscale+alpha asset and composited
+  over the squares. See [ATTRIBUTION.md](ATTRIBUTION.md) for licensing; regenerate
+  the asset with `python3 scripts/gen-pieces.py`.
+- **Vector** — dependency-free anti-aliased silhouettes drawn from primitives, no
+  asset required. A fallback / lightweight option.
 
 Preview a position as a PNG on your desktop:
 
 ```sh
-cargo run -p chesskom-render --example preview -- board.png            # start position
-cargo run -p chesskom-render --example preview -- board.png "<FEN>"    # any position
+cargo run -p chesskom-render --example preview -- board.png                   # start position
+cargo run -p chesskom-render --example preview -- board.png "<FEN>"           # any position
+cargo run -p chesskom-render --example preview -- board.png "<FEN>" vector    # vector pieces
 ```
 
 ### Building for the Kobo

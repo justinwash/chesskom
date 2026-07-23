@@ -4,8 +4,19 @@
 
 use crate::canvas::Canvas;
 use crate::font;
+use crate::piece_raster;
 use crate::pieces;
 use chess_core::{Color, Position, Square};
+
+/// Which piece artwork to draw.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PieceStyle {
+    /// Classic Cburnett raster set (embedded asset). Falls back to `Vector` if
+    /// the asset is unavailable.
+    Classic,
+    /// Dependency-free anti-aliased vector silhouettes (no asset needed).
+    Vector,
+}
 
 /// Look and layout of a rendered board. Defaults target the Kobo Clara BW
 /// (1072x1448 portrait, grayscale).
@@ -26,6 +37,8 @@ pub struct RenderOptions {
     pub footer: Option<String>,
     /// Highlight the from/to squares of the last move.
     pub highlight: Option<(Square, Square)>,
+    /// Which piece artwork to draw.
+    pub piece_style: PieceStyle,
 }
 
 impl RenderOptions {
@@ -42,6 +55,7 @@ impl RenderOptions {
             header: None,
             footer: None,
             highlight: None,
+            piece_style: PieceStyle::Classic,
         }
     }
 }
@@ -136,7 +150,13 @@ pub fn render(pos: &Position, opts: &RenderOptions) -> Canvas {
                 } else {
                     opts.light_sq
                 };
-                draw_piece(&mut c, piece.kind, piece.color, x, y, square, sq_bg);
+                let use_classic =
+                    opts.piece_style == PieceStyle::Classic && piece_raster::available();
+                if use_classic {
+                    piece_raster::draw(&mut c, piece.kind, piece.color, x, y, square, sq_bg);
+                } else {
+                    draw_piece(&mut c, piece.kind, piece.color, x, y, square, sq_bg);
+                }
             }
         }
     }

@@ -8,10 +8,11 @@
 pub mod board;
 pub mod canvas;
 pub mod font;
+pub mod piece_raster;
 pub mod pieces;
 pub mod png;
 
-pub use board::{render, RenderOptions};
+pub use board::{render, PieceStyle, RenderOptions};
 pub use canvas::Canvas;
 
 #[cfg(test)]
@@ -28,6 +29,22 @@ mod tests {
         // Sanity: the image is not a single flat color.
         let first = c.pixels[0];
         assert!(c.pixels.iter().any(|&p| p != first));
+    }
+
+    #[test]
+    fn classic_piece_asset_is_present_and_well_formed() {
+        assert!(piece_raster::available(), "embedded Cburnett asset must be valid");
+    }
+
+    #[test]
+    fn both_piece_styles_render() {
+        for style in [PieceStyle::Classic, PieceStyle::Vector] {
+            let mut opts = RenderOptions::clara_bw();
+            opts.piece_style = style;
+            let c = render(&Position::start(), &opts);
+            let first = c.pixels[0];
+            assert!(c.pixels.iter().any(|&p| p != first));
+        }
     }
 
     #[test]
