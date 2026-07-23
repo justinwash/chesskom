@@ -35,6 +35,56 @@ impl Canvas {
         self.pixels[(y * self.width + x) as usize]
     }
 
+    /// Alpha-blend value `v` onto pixel (x,y) with coverage in 0.0..=1.0.
+    #[inline]
+    pub fn blend(&mut self, x: i32, y: i32, v: u8, coverage: f32) {
+        if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
+            return;
+        }
+        let idx = (y as u32 * self.width + x as u32) as usize;
+        let bg = self.pixels[idx] as f32;
+        let out = bg * (1.0 - coverage) + v as f32 * coverage;
+        self.pixels[idx] = out.round() as u8;
+    }
+
+    /// Filled anti-aliased disc centered at (cx, cy).
+    pub fn disc(&mut self, cx: f32, cy: f32, r: f32, v: u8) {
+        let x0 = (cx - r - 1.0).floor() as i32;
+        let x1 = (cx + r + 1.0).ceil() as i32;
+        let y0 = (cy - r - 1.0).floor() as i32;
+        let y1 = (cy + r + 1.0).ceil() as i32;
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
+                let cov = (r + 0.5 - d).clamp(0.0, 1.0);
+                if cov > 0.0 {
+                    self.blend(x, y, v, cov);
+                }
+            }
+        }
+    }
+
+    /// Anti-aliased ring (annulus) centered at (cx, cy) between radii r-thick and r.
+    pub fn ring(&mut self, cx: f32, cy: f32, r: f32, thick: f32, v: u8) {
+        let inner = r - thick;
+        let x0 = (cx - r - 1.0).floor() as i32;
+        let x1 = (cx + r + 1.0).ceil() as i32;
+        let y0 = (cy - r - 1.0).floor() as i32;
+        let y1 = (cy + r + 1.0).ceil() as i32;
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
+                // Coverage of the band [inner, r].
+                let outer_cov = (r + 0.5 - d).clamp(0.0, 1.0);
+                let inner_cov = (d - (inner - 0.5)).clamp(0.0, 1.0);
+                let cov = outer_cov.min(inner_cov);
+                if cov > 0.0 {
+                    self.blend(x, y, v, cov);
+                }
+            }
+        }
+    }
+
     /// Fill an axis-aligned rectangle (clipped to bounds) with a solid value.
     pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, v: u8) {
         let x0 = x.max(0);

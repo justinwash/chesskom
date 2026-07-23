@@ -38,28 +38,29 @@ impl Default for Fbink {
 }
 
 impl Fbink {
-    /// Encode `canvas` to PNG and display it centered on the panel.
-    pub fn present(&self, canvas: &Canvas) -> io::Result<()> {
+    /// Encode `canvas` to PNG and display it centered on the panel. `full`
+    /// requests a flashing full refresh (best for clearing ghosting, e.g. the
+    /// first frame or after a reset); otherwise a lighter refresh is used so
+    /// taps feel responsive.
+    pub fn present(&self, canvas: &Canvas, full: bool) -> io::Result<()> {
         let bytes = chesskom_render::png::encode_grayscale(canvas);
         std::fs::write(&self.scratch, bytes)?;
-        self.present_file(&self.scratch)
+        self.present_file(&self.scratch, full)
     }
 
-    /// Display an existing PNG file centered on the panel, with a full refresh.
-    pub fn present_file(&self, png: &Path) -> io::Result<()> {
-        if self.clear {
+    /// Display an existing PNG file centered on the panel.
+    pub fn present_file(&self, png: &Path, full: bool) -> io::Result<()> {
+        if full && self.clear {
             // Best-effort clear; ignore failure so a missing feature doesn't abort.
             let _ = Command::new(&self.binary).arg("-c").status();
         }
-        let g = format!(
-            "file={},halign=CENTER,valign=CENTER",
-            png.display()
-        );
-        let status = Command::new(&self.binary)
-            .arg("-g")
-            .arg(&g)
-            .arg("-f") // full (flashing) refresh — best contrast for a whole board
-            .status()?;
+        let g = format!("file={},halign=CENTER,valign=CENTER", png.display());
+        let mut cmd = Command::new(&self.binary);
+        cmd.arg("-g").arg(&g);
+        if full {
+            cmd.arg("-f"); // full (flashing) refresh
+        }
+        let status = cmd.status()?;
         if status.success() {
             Ok(())
         } else {

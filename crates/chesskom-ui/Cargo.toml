@@ -1,0 +1,11 @@
+[package]
+name = "chesskom-ui"
+description = "Interactive game controller: tap-to-select/tap-to-move state machine, rewind controls, and rendering glue. Platform-agnostic (no I/O)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chess-core = { path = "../chess-core" }
+chesskom-render = { path = "../chesskom-render" }

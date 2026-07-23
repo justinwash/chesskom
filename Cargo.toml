@@ -4,6 +4,7 @@ members = [
     "crates/chess-core",
     "crates/chesskom-render",
     "crates/chesskom-cli",
+    "crates/chesskom-ui",
     "crates/chesskom-kobo",
 ]
 

@@ -8,12 +8,14 @@
 pub mod board;
 pub mod canvas;
 pub mod font;
+pub mod layout;
 pub mod piece_raster;
 pub mod pieces;
 pub mod png;
 
 pub use board::{render, PieceStyle, RenderOptions};
 pub use canvas::Canvas;
+pub use layout::{Control, HitTarget, Layout, Rect};
 
 #[cfg(test)]
 mod tests {

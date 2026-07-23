@@ -5,9 +5,11 @@ A chess client for Kobo e-readers (primary target: **Kobo Clara BW**), written i
 The goal, in order of milestones:
 
 1. **Local two-player pass-and-play with rewind** ✅
-2. **Board on the Kobo e-ink screen** ✅ *(current — static render; touch input next)*
-3. **chess.com viewer** — read-only browsing of your ongoing daily games
-4. **Lichess play** — make and submit real moves over the internet
+2. **Board on the Kobo e-ink screen** ✅
+3. **Interactive on-device play** ✅ *(current — tap to move + rewind controls;
+   touch mapping pending on-device calibration)*
+4. **chess.com viewer** — read-only browsing of your ongoing daily games
+5. **Lichess play** — make and submit real moves over the internet
 
 ## Why this shape? (feasibility & the ban question)
 
@@ -43,10 +45,15 @@ Some research went into scoping this. The short version:
 ```
 crates/
   chess-core/       dependency-free rules, move generation, game state, rewind, FEN
-  chesskom-render/  dependency-free grayscale board renderer (vector pieces, PNG export)
+  chesskom-render/  dependency-free grayscale renderer (pieces, overlays, layout/hit-test)
+  chesskom-ui/      interactive controller: tap-to-move state machine + rewind controls
   chesskom-cli/     terminal front-end (dev harness for local play + rewind)
-  chesskom-kobo/    Kobo e-ink device binary (framebuffer output via FBInk)
+  chesskom-kobo/    Kobo e-ink device binary (touch input + FBInk output)
 ```
+
+`chesskom-ui` holds the platform-agnostic app logic (selection, moves, navigation)
+and is fully unit-tested; the Kobo binary is a thin loop feeding it touch taps and
+painting its output.
 
 `chess-core` and `chesskom-render` have **no dependencies** and make no platform
 assumptions, so they cross-compile to the Kobo untouched. Everything
@@ -135,17 +142,31 @@ Cross-linking uses clang + LLD (no target toolchain package needed); see
 
 ### Running on the device
 
-`chesskom-kobo` draws the board to the e-ink panel via
-[**FBInk**](https://github.com/NiLuJe/FBInk), the maintained tool that handles
-each Kobo model's framebuffer format and refresh waveform. Install FBInk on the
-Kobo, then:
+`chesskom-kobo` draws to the e-ink panel via
+[**FBInk**](https://github.com/NiLuJe/FBInk) (the maintained tool that handles
+each Kobo model's framebuffer format and refresh waveform) and reads taps from the
+touchscreen. Install FBInk on the Kobo, then:
 
 ```sh
-chesskom-kobo                 # draw the starting position
-chesskom-kobo --flip          # Black at the bottom
-chesskom-kobo --fen "<FEN>"   # draw a specific position
+chesskom-kobo                 # interactive local two-player game (default)
+chesskom-kobo --calibrate     # print raw/mapped touch coords to tune the mapping
+chesskom-kobo --fen "<FEN>"   # static render of a position (no touch)
 chesskom-kobo --out board.png # desktop test: write a PNG instead of drawing
 ```
+
+**Playing:** tap a piece to select it (legal destinations light up — dots for
+quiet moves, rings for captures), tap a destination to move. The bottom control
+bar has `FIRST / PREV / NEXT / LIVE` (rewind), `FLIP`, `NEW`, and `QUIT`.
+Promotion currently auto-queens (an under-promotion picker is a TODO).
+
+**Touch calibration (one-time, per model):** the raw→screen coordinate mapping
+varies by Kobo model, so it's driven by `CHESSKOM_TOUCH_*` environment variables
+rather than hard-coded. Run `chesskom-kobo --calibrate`, tap the four corners, and
+adjust `CHESSKOM_TOUCH_SWAP`, `CHESSKOM_TOUCH_INVX`, `CHESSKOM_TOUCH_INVY`, and
+`CHESSKOM_TOUCH_MAX_X/Y` until the mapped coordinates match where you tapped. See
+`crates/chesskom-kobo/src/touch.rs` for the full list. This is the one piece that
+needs the physical device to finalize — everything above it is unit-tested and
+renders identically on the desktop.
 
 **Install path:** copy `dist/chesskom-kobo` to `/mnt/onboard/.adds/chesskom/` on
 the device (USB mass storage), `chmod +x` it, and either run it from a terminal

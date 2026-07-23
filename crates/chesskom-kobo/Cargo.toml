@@ -13,3 +13,4 @@ path = "src/main.rs"
 [dependencies]
 chess-core = { path = "../chess-core" }
 chesskom-render = { path = "../chesskom-render" }
+chesskom-ui = { path = "../chesskom-ui" }

@@ -19,6 +19,7 @@ version = "0.1.0"
 dependencies = [
  "chess-core",
  "chesskom-render",
+ "chesskom-ui",
 ]
 
 [[package]]
@@ -26,4 +27,12 @@ name = "chesskom-render"
 version = "0.1.0"
 dependencies = [
  "chess-core",
+]
+
+[[package]]
+name = "chesskom-ui"
+version = "0.1.0"
+dependencies = [
+ "chess-core",
+ "chesskom-render",
 ]
