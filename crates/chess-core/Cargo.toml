@@ -1,0 +1,9 @@
+[package]
+name = "chess-core"
+description = "Dependency-free chess rules, move generation, game state, and rewind. Portable to e-ink targets."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
