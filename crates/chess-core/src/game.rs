@@ -57,6 +57,11 @@ impl Game {
         }
     }
 
+    /// The initial position the game started from.
+    pub fn initial(&self) -> &Position {
+        &self.history[0]
+    }
+
     /// The live (latest) position, regardless of where the rewind cursor sits.
     pub fn current(&self) -> &Position {
         self.history.last().expect("history is never empty")

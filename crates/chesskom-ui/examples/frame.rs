@@ -11,6 +11,7 @@ fn main() {
     let out = std::env::args().nth(1).unwrap_or_else(|| "frame.png".to_string());
 
     let mut app = App::clara_bw();
+    app.start_new_local_game();
     // 1. e4 d5 — now the e4 pawn can capture on d5 (ring) or push to e5 (dot).
     for (a, b) in [("e2", "e4"), ("d7", "d5")] {
         app.tap_square(Square::from_algebraic(a).unwrap());

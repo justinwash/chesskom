@@ -15,7 +15,7 @@ pub enum Control {
     Live,  // jump view to the current position
     Flip,  // flip board orientation
     New,   // start a new game
-    Quit,  // exit
+    Menu,  // return to the main menu
 }
 
 impl Control {
@@ -27,7 +27,7 @@ impl Control {
             Control::Live => "LIVE",
             Control::Flip => "FLIP",
             Control::New => "NEW",
-            Control::Quit => "QUIT",
+            Control::Menu => "MENU",
         }
     }
 
@@ -40,7 +40,7 @@ impl Control {
             Control::Live,
             Control::Flip,
             Control::New,
-            Control::Quit,
+            Control::Menu,
         ]
     }
 }

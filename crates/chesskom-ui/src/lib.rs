@@ -1,24 +1,38 @@
-//! `chesskom-ui`: the interactive game controller.
+//! `chesskom-ui`: the interactive app — screens, the game controller, and history.
 //!
-//! This is the platform-agnostic brain of the on-device app. It owns a [`Game`],
-//! a selection, and board orientation, and turns two kinds of input — a tap on a
-//! board square and a press of a control button — into game-state changes and a
-//! rendered [`Canvas`]. It performs no I/O, so it is fully unit-testable; the Kobo
-//! binary is a thin loop that feeds it touch events and paints its output.
+//! The app is a small screen state machine:
+//!   MainMenu ──▶ LocalMenu ──▶ Game (play)
+//!      │             └───────▶ History ──▶ Game (replay)
+//!      ├──▶ ComingSoon("CHESS.COM")   (milestone 4)
+//!      └──▶ ComingSoon("LICHESS")     (milestone 5)
 //!
-//! Tap model (Lichess-style tap-tap, no dragging — ideal for slow e-ink):
-//! - Tap your piece to select it; legal destinations light up.
-//! - Tap a destination to move; tap the piece again to deselect; tap another of
-//!   your pieces to switch selection.
-//! - While reviewing history, a board tap returns to the live position first.
+//! It performs no I/O of its own: touch comes in as pixel taps, output is a
+//! rendered [`Canvas`], and history persistence goes through a [`HistoryStore`]
+//! the caller supplies. That keeps the whole thing unit-testable; the Kobo binary
+//! is a thin loop that feeds taps, paints frames, and provides a file-backed store.
+
+pub mod history;
+pub mod menu;
 
 use chess_core::{Color, Game, Move, MoveFlag, PieceKind, Square, Status};
-use chesskom_render::{
-    render, Canvas, Control, HitTarget, PieceStyle, RenderOptions,
-};
+use chesskom_render::{render, Canvas, Control, HitTarget, PieceStyle, RenderOptions};
+
+pub use history::{History, HistoryStore, NullStore, SavedGame};
+use menu::MenuLayout;
+
+/// Which screen is showing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Screen {
+    MainMenu,
+    LocalMenu,
+    History,
+    ComingSoon(&'static str),
+    Game,
+}
 
 /// The interactive application state.
 pub struct App {
+    screen: Screen,
     game: Game,
     selected: Option<Square>,
     orient: Color,
@@ -26,11 +40,16 @@ pub struct App {
     width: u32,
     height: u32,
     quit: bool,
+    history: History,
+    store: Box<dyn HistoryStore>,
 }
 
 impl App {
-    pub fn new(width: u32, height: u32) -> App {
+    /// Build an app with a specific screen size and history store.
+    pub fn with_store(width: u32, height: u32, store: Box<dyn HistoryStore>) -> App {
+        let history = store.load();
         App {
+            screen: Screen::MainMenu,
             game: Game::new(),
             selected: None,
             orient: Color::White,
@@ -38,22 +57,18 @@ impl App {
             width,
             height,
             quit: false,
+            history,
+            store,
         }
     }
 
-    /// Full-screen Clara BW app.
+    /// Full-screen Clara BW app with no persistence (desktop/testing default).
     pub fn clara_bw() -> App {
-        App::new(1072, 1448)
+        App::with_store(1072, 1448, Box::new(NullStore))
     }
 
     pub fn should_quit(&self) -> bool {
         self.quit
-    }
-
-    /// Replace the current game (e.g. to load a position). Clears any selection.
-    pub fn set_game(&mut self, game: Game) {
-        self.game = game;
-        self.selected = None;
     }
 
     pub fn game(&self) -> &Game {
@@ -68,20 +83,58 @@ impl App {
         self.orient
     }
 
+    pub fn history(&self) -> &History {
+        &self.history
+    }
+
+    /// True when a board (play/replay) is showing rather than a menu.
+    pub fn in_game(&self) -> bool {
+        self.screen == Screen::Game
+    }
+
+    /// Replace the current game and show the board (e.g. to load a position).
+    pub fn set_game(&mut self, game: Game) {
+        self.game = game;
+        self.selected = None;
+        self.screen = Screen::Game;
+    }
+
+    /// Start a fresh local game and switch to the board.
+    pub fn start_new_local_game(&mut self) {
+        self.save_current_game();
+        self.game = Game::new();
+        self.selected = None;
+        self.orient = Color::White;
+        self.screen = Screen::Game;
+    }
+
     // ---- Input ------------------------------------------------------------
 
     /// Handle a tap at pixel (x, y). Returns true if the display should redraw.
     pub fn tap_pixel(&mut self, x: u32, y: u32) -> bool {
-        match self.render_options().layout().hit(x, y) {
-            Some(HitTarget::Square(sq)) => self.tap_square(sq),
-            Some(HitTarget::Button(c)) => self.press(c),
-            None => false,
+        match self.screen {
+            Screen::Game => match self.render_options().layout().hit(x, y) {
+                Some(HitTarget::Square(sq)) => self.tap_square(sq),
+                Some(HitTarget::Button(c)) => self.press(c),
+                None => false,
+            },
+            _ => {
+                let (_, labels) = self.menu_spec();
+                let ml = MenuLayout::new(self.width, self.height, labels.len());
+                match ml.hit(x, y) {
+                    Some(i) => self.on_menu_select(i),
+                    None => false,
+                }
+            }
         }
     }
 
-    /// Handle a tap on a board square. Returns true if the display should redraw.
+    /// Handle a tap on a board square (game screen only).
     pub fn tap_square(&mut self, sq: Square) -> bool {
-        // Reviewing history: a board tap just returns to the live game.
+        if self.screen != Screen::Game {
+            return false;
+        }
+        // Reviewing history: a board tap returns to the live game.
         if !self.game.is_at_live() {
             self.game.forward_to_live();
             self.selected = None;
@@ -108,7 +161,6 @@ impl App {
                     self.selected = None;
                     return true;
                 }
-                // A legal destination from the selected piece?
                 if let Some(promo) = self.move_to(from, sq) {
                     let mv = Move {
                         from,
@@ -120,19 +172,17 @@ impl App {
                     self.selected = None;
                     return true;
                 }
-                // Switching to another of our own pieces?
                 if pos.piece_at(sq).map(|p| p.color) == Some(side) && self.is_selectable(sq) {
                     self.selected = Some(sq);
                     return true;
                 }
-                // Anywhere else: deselect.
                 self.selected = None;
                 true
             }
         }
     }
 
-    /// Handle a control-button press. Returns true if the display should redraw.
+    /// Handle a control-button press (game screen).
     pub fn press(&mut self, ctrl: Control) -> bool {
         match ctrl {
             Control::First => {
@@ -168,21 +218,83 @@ impl App {
                 true
             }
             Control::New => {
+                self.save_current_game();
                 self.game = Game::new();
                 self.selected = None;
                 self.orient = Color::White;
                 true
             }
-            Control::Quit => {
-                self.quit = true;
+            Control::Menu => {
+                self.save_current_game();
+                self.selected = None;
+                self.screen = Screen::LocalMenu;
+                true
+            }
+        }
+    }
+
+    /// Handle selecting item `i` on the current menu screen.
+    fn on_menu_select(&mut self, i: usize) -> bool {
+        match self.screen {
+            Screen::MainMenu => {
+                match i {
+                    0 => self.screen = Screen::LocalMenu,
+                    1 => self.screen = Screen::ComingSoon("CHESS.COM"),
+                    2 => self.screen = Screen::ComingSoon("LICHESS"),
+                    3 => self.quit = true,
+                    _ => return false,
+                }
+                true
+            }
+            Screen::LocalMenu => {
+                match i {
+                    0 => self.start_new_local_game(),
+                    1 => self.screen = Screen::History,
+                    2 => self.screen = Screen::MainMenu,
+                    _ => return false,
+                }
+                true
+            }
+            Screen::History => {
+                if self.history.is_empty() {
+                    // Items: ["(NO SAVED GAMES)", "BACK"].
+                    if i == 1 {
+                        self.screen = Screen::LocalMenu;
+                        return true;
+                    }
+                    return false;
+                }
+                let n = self.history.len();
+                if i < n {
+                    // Replay: load the game and start at its beginning.
+                    self.game = self.history.games[i].to_game();
+                    self.game.rewind_to_start();
+                    self.selected = None;
+                    self.orient = Color::White;
+                    self.screen = Screen::Game;
+                    true
+                } else if i == n {
+                    self.screen = Screen::LocalMenu;
+                    true
+                } else {
+                    false
+                }
+            }
+            Screen::ComingSoon(_) => {
+                // Items: ["COMING SOON", "BACK"].
+                if i == 1 {
+                    self.screen = Screen::MainMenu;
+                    return true;
+                }
                 false
             }
+            Screen::Game => false,
         }
     }
 
     // ---- Rendering --------------------------------------------------------
 
-    /// Build the render options that reflect the current state.
+    /// Render options for the game screen (also what the touch layer hit-tests).
     pub fn render_options(&self) -> RenderOptions {
         let mut opts = RenderOptions::clara_bw();
         opts.width = self.width;
@@ -198,14 +310,71 @@ impl App {
         opts
     }
 
-    /// Render the current state to a canvas.
+    /// Render the current screen to a canvas.
     pub fn render(&self) -> Canvas {
-        render(self.game.viewed(), &self.render_options())
+        match self.screen {
+            Screen::Game => render(self.game.viewed(), &self.render_options()),
+            _ => {
+                let (title, labels) = self.menu_spec();
+                MenuLayout::new(self.width, self.height, labels.len()).render(&title, &labels)
+            }
+        }
+    }
+
+    /// Title and item labels for the current menu screen.
+    fn menu_spec(&self) -> (String, Vec<String>) {
+        match self.screen {
+            Screen::MainMenu => (
+                "CHESSKOM".to_string(),
+                vec![
+                    "LOCAL".to_string(),
+                    "CHESS.COM".to_string(),
+                    "LICHESS".to_string(),
+                    "QUIT".to_string(),
+                ],
+            ),
+            Screen::LocalMenu => (
+                "LOCAL".to_string(),
+                vec![
+                    "NEW GAME".to_string(),
+                    "GAME HISTORY".to_string(),
+                    "BACK".to_string(),
+                ],
+            ),
+            Screen::History => {
+                let title = "HISTORY".to_string();
+                if self.history.is_empty() {
+                    (title, vec!["(NO SAVED GAMES)".to_string(), "BACK".to_string()])
+                } else {
+                    let mut labels: Vec<String> = self
+                        .history
+                        .games
+                        .iter()
+                        .enumerate()
+                        .map(|(i, g)| g.label(i))
+                        .collect();
+                    labels.push("BACK".to_string());
+                    (title, labels)
+                }
+            }
+            Screen::ComingSoon(name) => (
+                name.to_string(),
+                vec!["COMING SOON".to_string(), "BACK".to_string()],
+            ),
+            Screen::Game => ("CHESSKOM".to_string(), Vec::new()),
+        }
     }
 
     // ---- Helpers ----------------------------------------------------------
 
-    /// Is there at least one legal move from `sq` for the side to move?
+    /// Push the current game into history (if it has moves) and persist.
+    fn save_current_game(&mut self) {
+        if self.game.ply() > 0 {
+            self.history.add(SavedGame::from_game(&self.game));
+            self.store.save(&self.history);
+        }
+    }
+
     fn is_selectable(&self, sq: Square) -> bool {
         let pos = self.game.current();
         match pos.piece_at(sq) {
@@ -216,26 +385,22 @@ impl App {
         }
     }
 
-    /// If moving the selected piece from `from` to `to` is legal, return the
-    /// promotion piece to use (`Some(None)` = legal non-promotion; `Some(Some(k))`
-    /// = promotion, defaulting to queen). Returns `None` if the move is illegal.
+    /// If moving `from`→`to` is legal, return the promotion to use (queen by
+    /// default). `None` if illegal.
     fn move_to(&self, from: Square, to: Square) -> Option<Option<PieceKind>> {
         let pos = self.game.current();
-        let mut legal_here = pos
+        let legal: Vec<Move> = pos
             .legal_moves()
             .into_iter()
             .filter(|m| m.from == from && m.to == to)
-            .peekable();
-        legal_here.peek()?;
-        // If any legal move here is a promotion, default to queen.
-        let is_promo = pos
-            .legal_moves()
-            .iter()
-            .any(|m| m.from == from && m.to == to && m.promotion.is_some());
+            .collect();
+        if legal.is_empty() {
+            return None;
+        }
+        let is_promo = legal.iter().any(|m| m.promotion.is_some());
         Some(if is_promo { Some(PieceKind::Queen) } else { None })
     }
 
-    /// Destination squares of the selected piece (deduplicated).
     fn target_squares(&self) -> Vec<Square> {
         let Some(from) = self.selected else {
             return Vec::new();

@@ -154,10 +154,21 @@ chesskom-kobo --fen "<FEN>"   # static render of a position (no touch)
 chesskom-kobo --out board.png # desktop test: write a PNG instead of drawing
 ```
 
+**Menus:** the app boots to a title screen — `LOCAL / CHESS.COM / LICHESS / QUIT`
+(the last two are placeholders until milestones 4–5). `LOCAL` opens `NEW GAME`
+and `GAME HISTORY`.
+
 **Playing:** tap a piece to select it (legal destinations light up — dots for
 quiet moves, rings for captures), tap a destination to move. The bottom control
-bar has `FIRST / PREV / NEXT / LIVE` (rewind), `FLIP`, `NEW`, and `QUIT`.
-Promotion currently auto-queens (an under-promotion picker is a TODO).
+bar has `FIRST / PREV / NEXT / LIVE` (rewind), `FLIP`, `NEW`, and `MENU` (back to
+the menu). Promotion currently auto-queens (an under-promotion picker is a TODO).
+
+**Game history:** the last 10 games (any with moves) are kept and can be replayed
+from `LOCAL → GAME HISTORY` — pick one and step through it with the rewind
+controls, or tap the board to resume playing from where it left off. On the
+device, history is persisted to a small text file (path from `CHESSKOM_HISTORY`,
+default `./chesskom-history.txt`); the format is just the starting FEN and move
+list per game, so it's tiny and human-readable.
 
 **Touch calibration (one-time, per model):** the raw→screen coordinate mapping
 varies by Kobo model, so it's driven by `CHESSKOM_TOUCH_*` environment variables

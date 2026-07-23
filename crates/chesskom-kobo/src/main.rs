@@ -14,6 +14,7 @@
 //! See touch.rs for the touch calibration environment variables.
 
 mod fbink;
+mod store;
 mod touch;
 
 use chess_core::{parse_fen, Color, Position};
@@ -68,7 +69,7 @@ fn main() {
 
 /// Interactive game loop: present a frame, wait for a tap, update, repeat.
 fn run_interactive() {
-    let mut app = App::clara_bw();
+    let mut app = App::with_store(1072, 1448, Box::new(store::FileStore::from_env()));
     let display = fbink::Fbink::default();
 
     // Initial full refresh.
